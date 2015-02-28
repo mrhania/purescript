@@ -28,8 +28,9 @@ import qualified Control.Arrow as A
 
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Common
-import Language.PureScript.Pretty.Common
 import Language.PureScript.Comments
+import Language.PureScript.CoreImp.Operators
+import Language.PureScript.Pretty.Common
 
 import Numeric
 
@@ -209,7 +210,7 @@ instanceOf = mkPattern match
   match (JSInstanceOf val ty) = Just (val, ty)
   match _ = Nothing
 
-unary' :: UnaryOperator -> (JS -> String) -> Operator PrinterState JS String
+unary' :: JSUnaryOp -> (JS -> String) -> Operator PrinterState JS String
 unary' op mkStr = Wrap match (++)
   where
   match :: Pattern PrinterState JS (String, JS)
@@ -218,16 +219,16 @@ unary' op mkStr = Wrap match (++)
     match' (JSUnary op' val) | op' == op = Just (mkStr val, val)
     match' _ = Nothing
 
-unary :: UnaryOperator -> String -> Operator PrinterState JS String
+unary :: JSUnaryOp -> String -> Operator PrinterState JS String
 unary op str = unary' op (const str)
 
 negateOperator :: Operator PrinterState JS String
-negateOperator = unary' Negate (\v -> if isNegate v then "- " else "-")
+negateOperator = unary' JSNegate (\v -> if isNegate v then "- " else "-")
   where
-  isNegate (JSUnary Negate _) = True
+  isNegate (JSUnary JSNegate _) = True
   isNegate _ = False
 
-binary :: BinaryOperator -> String -> Operator PrinterState JS String
+binary :: BinaryOp -> String -> Operator PrinterState JS String
 binary op str = AssocL match (\v1 v2 -> v1 ++ " " ++ str ++ " " ++ v2)
   where
   match :: Pattern PrinterState JS (JS, JS)
@@ -273,15 +274,15 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                         ++ "(" ++ intercalate ", " args ++ ") "
                         ++ ret ]
                   , [ binary    LessThan             "<" ]
-                  , [ binary    LessThanOrEqualTo    "<=" ]
+                  , [ binary    LessThanOrEqual      "<=" ]
                   , [ binary    GreaterThan          ">" ]
-                  , [ binary    GreaterThanOrEqualTo ">=" ]
+                  , [ binary    GreaterThanOrEqual   ">=" ]
                   , [ Wrap typeOf $ \_ s -> "typeof " ++ s ]
                   , [ AssocR instanceOf $ \v1 v2 -> v1 ++ " instanceof " ++ v2 ]
-                  , [ unary     Not                  "!" ]
-                  , [ unary     BitwiseNot           "~" ]
+                  , [ unary     JSNot                "!" ]
+                  , [ unary     JSBitwiseNot         "~" ]
                   , [ negateOperator ]
-                  , [ unary     Positive             "+" ]
+                  , [ unary     JSPositive           "+" ]
                   , [ binary    Multiply             "*"
                     , binary    Divide               "/"
                     , binary    Modulus              "%" ]
@@ -290,8 +291,8 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                   , [ binary    ShiftLeft            "<<" ]
                   , [ binary    ShiftRight           ">>" ]
                   , [ binary    ZeroFillShiftRight   ">>>" ]
-                  , [ binary    EqualTo              "===" ]
-                  , [ binary    NotEqualTo           "!==" ]
+                  , [ binary    Equal                "===" ]
+                  , [ binary    NotEqual             "!==" ]
                   , [ binary    BitwiseAnd           "&" ]
                   , [ binary    BitwiseXor           "^" ]
                   , [ binary    BitwiseOr            "|" ]
